@@ -19,6 +19,7 @@ import {
   FaceMatch,
 } from "face-api.js";
 import { cymaticFrequency } from "../components/api/cymaticFrequency";
+import PlayTone from "../components/PlayTone/PlayTone";
 
 const WIDTH = 420;
 const HEIGHT = 420;
@@ -85,7 +86,7 @@ class VideoInput extends Component<Props, State> {
   startCapture = () => {
     this.interval = setInterval(() => {
       this.capture();
-    }, 1500);
+    }, 500);
   };
 
   componentWillUnmount() {
@@ -117,8 +118,25 @@ class VideoInput extends Component<Props, State> {
     }
   };
 
+  debounce = (func: VoidFunction, wait: number, immediate?: boolean) => {
+    var timeout;
+    return function () {
+      var context = this,
+        args = arguments;
+      var later = function () {
+        timeout = null;
+        if (!immediate) func.apply(context, args);
+      };
+      var callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      if (callNow) func.apply(context, args);
+    };
+  };
+
   render() {
     const { match, facingMode, descriptors, faceMatcher } = this.state;
+    const frequency = (match?.[0]?.label as unknown) as number;
 
     let videoConstraints = null;
     if (!!facingMode) {
@@ -131,11 +149,16 @@ class VideoInput extends Component<Props, State> {
 
     match?.map((match, i) => {
       if (match.label === "unknown" && descriptors?.[i]) {
-        console.log("unknown face registering");
+        console.log(
+          "unknown face registering, known faces: " +
+            faceMatcher.labeledDescriptors.length
+        );
+        // this.debounce(() => {
         const newMatch = new LabeledFaceDescriptors(cymaticFrequency(), [
           descriptors[i],
         ]);
         faceMatcher.labeledDescriptors.push(newMatch);
+        // }, 5000);
       }
     });
 
@@ -172,7 +195,7 @@ class VideoInput extends Component<Props, State> {
           <br />
           {match?.[0]?.label}
         </h3>
-        <div>player</div>
+        <PlayTone frequency={isNaN(frequency) ? undefined : frequency} />
       </div>
     );
   }

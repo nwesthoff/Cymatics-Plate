@@ -15,6 +15,7 @@
     "react": "16.13.1",
     "react-dom": "16.13.1",
     "react-webcam": "^5.2.0",
+    "tone": "^14.7.39",
     "uuid": "^8.3.0"
   },
   "devDependencies": {
