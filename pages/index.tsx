@@ -1,6 +1,4 @@
-import Head from "next/head";
-import styles from "../styles/Home.module.css";
-import { useEffect, useState, useRef } from "react";
+import React, { Component } from "react";
 import Webcam from "react-webcam";
 import {
   loadModels,
@@ -8,111 +6,180 @@ import {
   createMatcher,
 } from "../components/api/face";
 
+// Import face profile
 import JSON_PROFILE from "./descriptors/bnk48.json";
-import { LabeledFaceDescriptors } from "face-api.js";
+import {
+  FaceDetection,
+  LabeledFaceDescriptors,
+  WithFaceDescriptor,
+  WithFaceLandmarks,
+  FaceLandmarks68,
+  FaceMatcher,
+  FaceMatch,
+} from "face-api.js";
+import { cymaticFrequency } from "../components/api/cymaticFrequency";
+import PlayTone from "../components/PlayTone/PlayTone";
+
 const WIDTH = 420;
 const HEIGHT = 420;
-const inputSize = 160;
+const inputSize = 320;
 
-export default function Home() {
-  const videoElRef = useRef<Webcam & HTMLVideoElement>(null);
-  const canvasElRef = useRef<HTMLCanvasElement>(null);
-  const [intervalFn, setIntervalFn] = useState(null);
-  const [descriptors, setDescriptors] = useState<Float32Array[] | null>(null);
-  const [detections, setDetections] = useState(null);
-  const [labeledDescriptors, setLabeledDescriptors] = useState(null);
-  const [faceMatcher, setFaceMatcher] = useState(null);
-  const [match, setMatch] = useState(null);
-  const [facingMode, setFacingMode] = useState("user");
+interface Props {}
 
-  function setInputDevice() {
-    navigator.mediaDevices.getUserMedia({ video: {} }).then(() => {
-      startCapture();
+interface State {
+  fullDesc: WithFaceDescriptor<
+    WithFaceLandmarks<{ detection: FaceDetection }, FaceLandmarks68>
+  > | null;
+
+  matches: FaceMatch[] | null;
+  facingMode: "user" | { exact: "environment" };
+}
+
+class VideoInput extends Component<Props, State> {
+  webcam: React.RefObject<Webcam & HTMLVideoElement>;
+  interval: NodeJS.Timeout;
+  faceMatcher: FaceMatcher | null;
+  detections: FaceDetection | null;
+  descriptors: Float32Array[] | null;
+
+  constructor(props) {
+    super(props);
+    this.webcam = React.createRef();
+    this.faceMatcher = null;
+    this.descriptors = null;
+    this.detections = null;
+
+    this.state = {
+      fullDesc: null,
+      matches: null,
+      facingMode: null,
+    };
+  }
+
+  componentDidMount = async () => {
+    await loadModels();
+    this.faceMatcher = await createMatcher(JSON_PROFILE);
+    this.setInputDevice();
+  };
+
+  setInputDevice = () => {
+    navigator.mediaDevices.enumerateDevices().then(async (devices) => {
+      let inputDevice = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
+      if (inputDevice.length < 2) {
+        this.setState({
+          facingMode: "user",
+        });
+      } else {
+        this.setState({
+          facingMode: { exact: "environment" },
+        });
+      }
+      this.startCapture();
     });
+  };
+
+  startCapture = () => {
+    this.interval = setInterval(() => {
+      this.capture();
+    }, 500);
+  };
+
+  componentWillUnmount() {
+    clearInterval(this.interval);
   }
 
-  function startCapture() {
-    setIntervalFn(
-      setInterval(() => {
-        capture();
-      }, 500)
-    );
-  }
-
-  const capture = async () => {
-    if (!!videoElRef.current) {
-      const currentScreenshot = videoElRef.current.getScreenshot();
+  capture = async () => {
+    if (!!this.webcam.current) {
+      const currentScreenshot = this.webcam.current.getScreenshot();
       currentScreenshot &&
         (await getFullFaceDescription(currentScreenshot, inputSize).then(
           (fullDesc) => {
             if (!!fullDesc) {
-              setDescriptors(fullDesc.map((fd) => fd.descriptor));
-              setDetections(fullDesc.map((fd) => fd.detection));
+              this.descriptors = [fullDesc.descriptor];
+              this.detections = fullDesc.detection;
+
+              if (!!this.descriptors && !!this.faceMatcher) {
+                let matches = this.descriptors.map((descriptor) =>
+                  this.faceMatcher.findBestMatch(descriptor)
+                );
+
+                matches?.map((match, i) => {
+                  if (match.label === "unknown" && this.descriptors?.[i]) {
+                    console.log(
+                      "unknown face registering, known faces: " +
+                        this.faceMatcher.labeledDescriptors.length
+                    );
+                    const cymaticFreq = cymaticFrequency();
+                    const newMatch = new LabeledFaceDescriptors(cymaticFreq, [
+                      this.descriptors[i],
+                    ]);
+                    this.faceMatcher.labeledDescriptors.push(newMatch);
+                  }
+                });
+
+                this.setState({ matches });
+              }
+            } else {
+              this.setState({ matches: null });
             }
           }
         ));
-
-      if (!!descriptors && !!faceMatcher) {
-        let match = descriptors.map((descriptor) =>
-          faceMatcher.findBestMatch(descriptor)
-        );
-        setMatch(match);
-      }
     }
   };
 
-  const initialize = async () => {
-    await loadModels();
-    setFaceMatcher(await createMatcher(JSON_PROFILE));
-    setInputDevice();
-  };
+  render() {
+    const { matches, facingMode } = this.state;
+    const label = matches?.[0]?.label;
+    const frequency = (label as unknown) as number;
 
-  useEffect(() => {
-    initialize();
+    let videoConstraints = null;
+    if (!!facingMode) {
+      videoConstraints = {
+        width: WIDTH,
+        height: HEIGHT,
+        facingMode: facingMode,
+      };
+    }
 
-    return () => {
-      clearInterval(intervalFn);
-    };
-  }, [match, detections, descriptors, labeledDescriptors]);
-
-  return (
-    <div className={styles.container}>
-      <Head>
-        <title>Detect my face</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <div style={{ position: "relative" }}>
-        <Webcam
-          ref={videoElRef}
-          audio={false}
-          width={WIDTH}
-          height={HEIGHT}
-          screenshotFormat="image/jpeg"
-          videoConstraints={{
+    return (
+      <div
+        className="Camera"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
             width: WIDTH,
             height: HEIGHT,
-            facingMode: facingMode,
           }}
-        />
-        <canvas ref={canvasElRef} />
-        <h3>match: {match}</h3>
+        >
+          {!!videoConstraints ? (
+            <div style={{ position: "absolute" }}>
+              <Webcam
+                audio={false}
+                width={WIDTH}
+                height={HEIGHT}
+                ref={this.webcam}
+                screenshotFormat="image/jpeg"
+                videoConstraints={videoConstraints}
+              />
+            </div>
+          ) : null}
+        </div>
         <h3>
-          descriptor:{" "}
-          <span
-            style={{
-              width: "12rem",
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-              display: "inline-block",
-              whiteSpace: "nowrap",
-              verticalAlign: "bottom",
-            }}
-          >
-            {descriptors || "nothing yet"}
-          </span>
+          match:
+          <br />
+          {label || null}
         </h3>
+        <PlayTone frequency={isNaN(frequency) ? undefined : frequency} />
       </div>
-    </div>
-  );
+    );
+  }
 }
+
+export default VideoInput;
