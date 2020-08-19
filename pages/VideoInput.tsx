@@ -1,6 +1,5 @@
 import React, { Component } from "react";
 import Webcam from "react-webcam";
-import { v4 as uuidv4 } from "uuid";
 import {
   loadModels,
   getFullFaceDescription,
@@ -27,10 +26,6 @@ const inputSize = 160;
 
 interface Props {}
 
-interface CustomFaceProps extends FaceMatch {
-  frequency?: number;
-}
-
 interface State {
   detections: FaceDetection | null;
   fullDesc: WithFaceDescriptor<
@@ -39,7 +34,7 @@ interface State {
 
   descriptors: Float32Array[] | null;
   faceMatcher: FaceMatcher | null;
-  match: CustomFaceProps[] | null;
+  matches: FaceMatch[] | null;
   facingMode: "user" | { exact: "environment" };
 }
 
@@ -54,7 +49,7 @@ class VideoInput extends Component<Props, State> {
       detections: null,
       descriptors: null,
       faceMatcher: null,
-      match: null,
+      matches: null,
       facingMode: null,
     };
   }
@@ -109,11 +104,25 @@ class VideoInput extends Component<Props, State> {
         ));
 
       if (!!this.state.descriptors && !!this.state.faceMatcher) {
-        let match = this.state.descriptors.map((descriptor) =>
+        let matches = this.state.descriptors.map((descriptor) =>
           this.state.faceMatcher.findBestMatch(descriptor)
         );
 
-        this.setState({ match });
+        matches?.map((match, i) => {
+          if (match.label === "unknown" && this.state.descriptors?.[i]) {
+            console.log(
+              "unknown face registering, known faces: " +
+                this.state.faceMatcher.labeledDescriptors.length
+            );
+            const cymaticFreq = cymaticFrequency();
+            const newMatch = new LabeledFaceDescriptors(cymaticFreq, [
+              this.state.descriptors[i],
+            ]);
+            this.state.faceMatcher.labeledDescriptors.push(newMatch);
+          }
+        });
+
+        this.setState({ matches });
       }
     }
   };
@@ -135,7 +144,7 @@ class VideoInput extends Component<Props, State> {
   };
 
   render() {
-    const { match, facingMode, descriptors, faceMatcher } = this.state;
+    const { matches: match, facingMode, descriptors, faceMatcher } = this.state;
     const frequency = (match?.[0]?.label as unknown) as number;
 
     let videoConstraints = null;
@@ -146,21 +155,6 @@ class VideoInput extends Component<Props, State> {
         facingMode: facingMode,
       };
     }
-
-    match?.map((match, i) => {
-      if (match.label === "unknown" && descriptors?.[i]) {
-        console.log(
-          "unknown face registering, known faces: " +
-            faceMatcher.labeledDescriptors.length
-        );
-        // this.debounce(() => {
-        const newMatch = new LabeledFaceDescriptors(cymaticFrequency(), [
-          descriptors[i],
-        ]);
-        faceMatcher.labeledDescriptors.push(newMatch);
-        // }, 5000);
-      }
-    });
 
     return (
       <div
