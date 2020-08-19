@@ -63,21 +63,24 @@ class VideoInput extends Component<Props, State> {
   };
 
   setInputDevice = () => {
-    navigator.mediaDevices.enumerateDevices().then(async (devices) => {
-      let inputDevice = devices.filter(
-        (device) => device.kind === "videoinput"
-      );
-      if (inputDevice.length < 2) {
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then(async (devices) => {
+        // let inputDevice = devices.filter(
+        //   (device) => device.kind === "videoinput"
+        // );
         this.setState({
           facingMode: "user",
         });
-      } else {
-        this.setState({
-          facingMode: { exact: "environment" },
-        });
-      }
-      this.startCapture();
-    });
+
+        // if (inputDevice.length < 2) {
+        // } else {
+        //   this.setState({
+        //     facingMode: { exact: "environment" },
+        //   });
+        // }
+        this.startCapture();
+      });
   };
 
   startCapture = () => {
