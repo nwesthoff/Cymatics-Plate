@@ -28,6 +28,10 @@ export default function PlayTone({ frequency }: Props): ReactElement {
     setSynth(synth);
     frequency && synth.triggerAttack(frequency);
     setCurrentFrequency(frequency);
+
+    return () => {
+      synth.triggerRelease();
+    };
   }, []);
 
   if (synth && frequency !== currentFrequency) {

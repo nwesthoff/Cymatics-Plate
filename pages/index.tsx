@@ -57,28 +57,24 @@ class VideoInput extends Component<Props, State> {
   }
 
   componentDidMount = async () => {
+    console.time("loading models");
     await loadModels();
+    console.timeEnd("loading models");
+    console.time("creating facematcher");
     this.faceMatcher = await createMatcher(JSON_PROFILE);
+    console.timeEnd("creating facematcher");
+    console.time("setting inputdevice");
     this.setInputDevice();
+    console.timeEnd("setting inputdevice");
   };
 
   setInputDevice = () => {
     navigator.mediaDevices
       .getUserMedia({ video: true })
       .then(async (devices) => {
-        // let inputDevice = devices.filter(
-        //   (device) => device.kind === "videoinput"
-        // );
         this.setState({
           facingMode: "user",
         });
-
-        // if (inputDevice.length < 2) {
-        // } else {
-        //   this.setState({
-        //     facingMode: { exact: "environment" },
-        //   });
-        // }
         this.startCapture();
       });
   };
@@ -115,10 +111,12 @@ class VideoInput extends Component<Props, State> {
                         this.faceMatcher.labeledDescriptors.length
                     );
                     const cymaticFreq = cymaticFrequency();
+                    console.time("registered face");
                     const newMatch = new LabeledFaceDescriptors(cymaticFreq, [
                       this.descriptors[i],
                     ]);
                     this.faceMatcher.labeledDescriptors.push(newMatch);
+                    console.timeEnd("registered face");
                   }
                 });
 
