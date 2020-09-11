@@ -33,6 +33,7 @@ interface State {
 
   matches: FaceMatch[] | null;
   facingMode: "user" | { exact: "environment" };
+  registeredFaces: string[] | null;
 }
 
 class VideoInput extends Component<Props, State> {
@@ -53,6 +54,7 @@ class VideoInput extends Component<Props, State> {
       fullDesc: null,
       matches: null,
       facingMode: null,
+      registeredFaces: null,
     };
   }
 
@@ -116,6 +118,12 @@ class VideoInput extends Component<Props, State> {
                       this.descriptors[i],
                     ]);
                     this.faceMatcher.labeledDescriptors.push(newMatch);
+                    this.setState({
+                      registeredFaces:
+                        this.state.registeredFaces?.length > 0
+                          ? this.state.registeredFaces.concat(currentScreenshot)
+                          : [currentScreenshot],
+                    });
                     console.timeEnd("registered face");
                   }
                 });
@@ -178,6 +186,16 @@ class VideoInput extends Component<Props, State> {
           {label || null}
         </h3>
         <PlayTone frequency={isNaN(frequency) ? undefined : frequency} />
+        <div>
+          {this.state.registeredFaces?.length > 0 &&
+            this.state.registeredFaces.map((baseString) => (
+              <img
+                key={baseString}
+                src={baseString}
+                style={{ maxWidth: 200, padding: ".4rem" }}
+              />
+            ))}
+        </div>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import React, { ReactElement, useEffect, useState } from "react";
-import { Synth } from "tone";
+import { Synth, start } from "tone";
 
 interface Props {
   frequency?: number;
@@ -9,7 +9,7 @@ export default function PlayTone({ frequency }: Props): ReactElement {
   const [currentFrequency, setCurrentFrequency] = useState<number | undefined>(
     undefined
   );
-  const [synth, setSynth] = useState(null);
+  const [synth, setSynth] = useState<Synth>(null);
 
   useEffect(() => {
     const synth = new Synth({
@@ -40,5 +40,13 @@ export default function PlayTone({ frequency }: Props): ReactElement {
     setCurrentFrequency(frequency);
   }
 
-  return null;
+  return (
+    <button
+      onClick={() => {
+        start();
+      }}
+    >
+      Start sound
+    </button>
+  );
 }
