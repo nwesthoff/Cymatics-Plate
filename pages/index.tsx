@@ -190,8 +190,6 @@ class VideoInput extends Component<Props, State> {
       (face) => face.id === matchId
     );
 
-    console.log(this.state.registeredFaces);
-
     let videoConstraints = null;
     if (!!facingMode) {
       videoConstraints = {
