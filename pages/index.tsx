@@ -19,12 +19,23 @@ import {
 } from "face-api.js";
 import { cymaticFrequency } from "../components/api/cymaticFrequency";
 import PlayTone from "../components/PlayTone/PlayTone";
+import { v4 as uuidv4 } from "uuid";
+import RegisteredFaceDisplay from "../components/RegisteredFaceDisplay";
 
 const WIDTH = 420;
 const HEIGHT = 420;
 const inputSize = 320;
+const convertedFrequency = 1140;
 
 interface Props {}
+
+export interface RegisteredFace {
+  frequency: number;
+  id: string;
+  match: LabeledFaceDescriptors | null;
+  screenshot: string;
+  converted: boolean;
+}
 
 interface State {
   fullDesc: WithFaceDescriptor<
@@ -33,7 +44,7 @@ interface State {
 
   matches: FaceMatch[] | null;
   facingMode: "user" | { exact: "environment" };
-  registeredFaces: string[] | null;
+  registeredFaces: RegisteredFace[] | null;
 }
 
 class VideoInput extends Component<Props, State> {
@@ -112,17 +123,27 @@ class VideoInput extends Component<Props, State> {
                       "unknown face registering, known faces: " +
                         this.faceMatcher.labeledDescriptors.length
                     );
-                    const cymaticFreq = cymaticFrequency();
+
+                    const uuid = uuidv4();
                     console.time("registered face");
-                    const newMatch = new LabeledFaceDescriptors(cymaticFreq, [
+                    const newMatch = new LabeledFaceDescriptors(uuid, [
                       this.descriptors[i],
                     ]);
+
                     this.faceMatcher.labeledDescriptors.push(newMatch);
+                    const newRegisteredFace = {
+                      frequency: cymaticFrequency(),
+                      match: newMatch,
+                      id: uuid,
+                      screenshot: currentScreenshot,
+                      converted: false,
+                    };
+
                     this.setState({
                       registeredFaces:
                         this.state.registeredFaces?.length > 0
-                          ? this.state.registeredFaces.concat(currentScreenshot)
-                          : [currentScreenshot],
+                          ? this.state.registeredFaces.concat(newRegisteredFace)
+                          : [newRegisteredFace],
                     });
                     console.timeEnd("registered face");
                   }
@@ -138,10 +159,38 @@ class VideoInput extends Component<Props, State> {
     }
   };
 
+  convertFaceHandler = (face: RegisteredFace) => {
+    const registeredFaces = [...this.state.registeredFaces];
+    registeredFaces.map((registeredFace) => {
+      if (registeredFace.id === face.id) {
+        registeredFace.converted = !registeredFace.converted;
+      }
+    });
+    this.setState({ registeredFaces });
+    console.log(`face ${face.id} converted`);
+  };
+
+  deleteFaceHandler = (face: RegisteredFace) => {
+    const registeredFaces = this.state.registeredFaces.filter(
+      (registeredFace) => {
+        if (registeredFace.id !== face.id) {
+          return registeredFace;
+        }
+      }
+    );
+
+    this.setState({ registeredFaces });
+    console.log(`face ${face.id} deleted`);
+  };
+
   render() {
     const { matches, facingMode } = this.state;
-    const label = matches?.[0]?.label;
-    const frequency = (label as unknown) as number;
+    const matchId = matches?.[0]?.label;
+    const registeredFace = this.state.registeredFaces?.find(
+      (face) => face.id === matchId
+    );
+
+    console.log(this.state.registeredFaces);
 
     let videoConstraints = null;
     if (!!facingMode) {
@@ -183,16 +232,37 @@ class VideoInput extends Component<Props, State> {
         <h3>
           match:
           <br />
-          {label || null}
+          {registeredFace?.converted
+            ? convertedFrequency
+            : registeredFace
+            ? registeredFace.frequency
+            : null}
         </h3>
-        <PlayTone frequency={isNaN(frequency) ? undefined : frequency} />
-        <div>
+        <PlayTone
+          frequency={
+            registeredFace?.converted
+              ? convertedFrequency
+              : registeredFace
+              ? registeredFace.frequency
+              : null
+          }
+        />
+        <div
+          style={{
+            width: "980px",
+            maxWidth: "90%",
+            display: "flex",
+            flexWrap: "wrap",
+            padding: "1.2rem",
+          }}
+        >
           {this.state.registeredFaces?.length > 0 &&
-            this.state.registeredFaces.map((baseString) => (
-              <img
-                key={baseString}
-                src={baseString}
-                style={{ maxWidth: 200, padding: ".4rem" }}
+            this.state.registeredFaces.map((face) => (
+              <RegisteredFaceDisplay
+                currentMatch={registeredFace?.id}
+                clickHandler={this.convertFaceHandler}
+                deleteHandler={this.deleteFaceHandler}
+                face={face}
               />
             ))}
         </div>
