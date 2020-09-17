@@ -1,19 +1,21 @@
 import React, { ReactElement, useEffect, useState } from "react";
-import { Synth, start } from "tone";
+import { Synth, start, Volume } from "tone";
+import { Tone } from "tone/build/esm/core/Tone";
 
 interface Props {
   frequency?: number;
+  volume?: number;
 }
 
-export default function PlayTone({ frequency }: Props): ReactElement {
+export default function PlayTone({ frequency, volume }: Props): ReactElement {
   const [currentFrequency, setCurrentFrequency] = useState<number | undefined>(
     undefined
   );
   const [synth, setSynth] = useState<Synth>(null);
 
   useEffect(() => {
+    const vol = new Volume(volume);
     const synth = new Synth({
-      volume: 0.3,
       envelope: {
         attack: 0.3,
         attackCurve: "linear",
@@ -23,7 +25,9 @@ export default function PlayTone({ frequency }: Props): ReactElement {
         releaseCurve: "linear",
         sustain: 0.3,
       },
-    }).toDestination();
+    })
+      .connect(vol)
+      .toDestination();
 
     setSynth(synth);
     frequency && synth.triggerAttack(frequency);

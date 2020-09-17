@@ -31,6 +31,7 @@ interface Props {}
 
 export interface RegisteredFace {
   frequency: number;
+  volume: number;
   id: string;
   match: LabeledFaceDescriptors | null;
   screenshot: string;
@@ -129,10 +130,11 @@ class VideoInput extends Component<Props, State> {
                     const newMatch = new LabeledFaceDescriptors(uuid, [
                       this.descriptors[i],
                     ]);
-
+                    const frequency = cymaticFrequency();
                     this.faceMatcher.labeledDescriptors.push(newMatch);
                     const newRegisteredFace = {
-                      frequency: cymaticFrequency(),
+                      frequency: frequency[0],
+                      volume: frequency[1],
                       match: newMatch,
                       id: uuid,
                       screenshot: currentScreenshot,
@@ -244,6 +246,7 @@ class VideoInput extends Component<Props, State> {
               ? registeredFace.frequency
               : null
           }
+          volume={registeredFace?.converted ? 0.5 : registeredFace?.volume}
         />
         <div
           style={{
